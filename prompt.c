@@ -33,6 +33,8 @@ void add_history(const char * unused){}
 #define FALSE 0
 
 
+long eval(mpc_ast_t* x);
+
 int main(int argv, char **argc){
 
 	mpc_parser_t* Number = mpc_new("number");
@@ -52,14 +54,15 @@ int main(int argv, char **argc){
 			Number, Operator, Expr, Lispy);
 
 	// Version prompt
-	puts("Lispy version 0.0.1");
+	puts("Lispy version 0.0.2");
 	puts("Press Ctrl+c to exit\n");
 
 	while(TRUE){
 		char * input = readline("lispy>");
 		add_history(input);
 		if (mpc_parse("<stdin>", input, Lispy, &r)) {
-			mpc_ast_print(r.output);
+			long result = eval(r.output);
+			printf("%li\n", result);
 			mpc_ast_delete(r.output);
 		} else{
 			mpc_err_print(r.error);
@@ -71,3 +74,29 @@ int main(int argv, char **argc){
 	mpc_cleanup(4, Number, Operator, Expr, Lispy);
 	return 0;
 }
+
+long eval_operator(const long a1, const long a2, const char * operator){
+	char operand = operator[0];
+	switch(operand){
+		case '+': return a1+a2;
+		case '-': return a1-a2;
+		case '*': return a1*a2;
+		case '/': return a1/a2;
+		default: return 0;
+	}
+}
+
+
+long eval(mpc_ast_t* input){
+	if (strstr(input->tag, "number")) {
+		return atoi(input->contents);
+	}
+	long ret = eval(input->children[2]);
+	int i = 3;
+	char * operator = input->children[1]->contents;
+	while(strstr(input->children[i]->tag, "expr")) {
+		ret = eval_operator(ret, eval(input->children[i]), operator);
+		i++;
+	}
+	return ret;	
+}	
