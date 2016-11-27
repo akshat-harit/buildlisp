@@ -76,14 +76,12 @@ int main(int argv, char **argc){
 }
 
 long eval_operator(const long a1, const long a2, const char * operator){
-	char operand = operator[0];
-	switch(operand){
-		case '+': return a1+a2;
-		case '-': return a1-a2;
-		case '*': return a1*a2;
-		case '/': return a1/a2;
-		default: return 0;
-	}
+	if(!strcmp(operator, "+")) return a1+a2;
+	if(!strcmp(operator, "-")) return a1-a2;
+	if(!strcmp(operator, "*")) return a1*a2;
+	if(!strcmp(operator, "/")) return a1/a2;
+	return 0;
+	
 }
 
 
