@@ -2,9 +2,18 @@
 #include<stdlib.h>
 #include "mpc.h"
 
+typedef struct {
+	int type;
+	long num;
+	int err;
+} lval;
+
+enum {LVAL_NUM, LVAL_ERR};
+enum {LERR_DIV_ZERO, LERR_BAD_OP, LERR_BAD_NUM};
+
+
 #ifdef _WIN32
 #include<string.h>
-
 #define BUFFER_SIZE 2048
 static char buffer[BUFFER_SIZE];
 
@@ -32,8 +41,76 @@ void add_history(const char * unused){}
 #define TRUE 1
 #define FALSE 0
 
+lval lval_num(long x){
+	lval v;
+	v.type = LVAL_NUM;
+	v.num = x;
+	v.err = -1;
+	return v;
+}
 
-long eval(mpc_ast_t* x);
+lval lval_err(int x){
+	lval v;
+	v.type = LVAL_ERR;
+	v.err = x;
+	v.num = 0;
+	return v;
+}
+
+void lval_print(lval v){
+	switch(v.type){
+		case LVAL_NUM: printf("%li", v.num);break;
+		case LVAL_ERR:
+		switch(v.err){
+			case LERR_DIV_ZERO	: printf("Error: Division by Zero!"); break;
+			case LERR_BAD_OP	: printf("Error: Invalid operator!"); break;
+			case LERR_BAD_NUM	: printf("Error: Invalid Number!"); break;
+			default 		: printf("Unknown Error!"); break;
+			}
+			break;
+		default: printf("Lval type invalid!!!");
+		}
+}
+
+void lval_println(lval v){
+	lval_print(v); 
+	putchar('\n');
+}
+
+lval eval_operator(const lval x, const lval y, const char * op){
+	
+	if(x.type == LVAL_ERR){return x;}
+	if(y.type == LVAL_ERR){return y;}
+	long a1 = x.num;
+	long a2 = y.num;
+	if(!strcmp(op, "+")) {return lval_num(a1+a2);}
+	if(!strcmp(op, "-")) {return lval_num(a1-a2);}
+	if(!strcmp(op, "*")) {return lval_num(a1*a2);}
+	if(!strcmp(op, "/")) {
+		if (a2 == 0 )
+			return lval_err(LERR_DIV_ZERO);
+		else
+			return lval_num(a1/a2);
+		}
+	return lval_err(LERR_BAD_OP);;
+}
+
+lval eval(mpc_ast_t* input){
+
+	if (strstr(input->tag, "number")) {
+		errno = 0;
+		long x = strtol(input->contents, NULL, 10);
+		return (errno != ERANGE) ? lval_num(x) : lval_err(LERR_BAD_NUM);
+	}
+	lval ret = eval(input->children[2]);
+	int i = 3;
+	char * operator = input->children[1]->contents;
+	while(strstr(input->children[i]->tag, "expr")) {
+		ret = eval_operator(ret, eval(input->children[i]), operator);
+		i++;
+	}
+	return ret;	
+}	
 
 int main(int argv, char **argc){
 
@@ -61,8 +138,8 @@ int main(int argv, char **argc){
 		char * input = readline("lispy>");
 		add_history(input);
 		if (mpc_parse("<stdin>", input, Lispy, &r)) {
-			long result = eval(r.output);
-			printf("%li\n", result);
+			lval result = eval(r.output);
+			lval_println(result);
 			mpc_ast_delete(r.output);
 		} else{
 			mpc_err_print(r.error);
@@ -75,26 +152,3 @@ int main(int argv, char **argc){
 	return 0;
 }
 
-long eval_operator(const long a1, const long a2, const char * operator){
-	if(!strcmp(operator, "+")) return a1+a2;
-	if(!strcmp(operator, "-")) return a1-a2;
-	if(!strcmp(operator, "*")) return a1*a2;
-	if(!strcmp(operator, "/")) return a1/a2;
-	return 0;
-	
-}
-
-
-long eval(mpc_ast_t* input){
-	if (strstr(input->tag, "number")) {
-		return atoi(input->contents);
-	}
-	long ret = eval(input->children[2]);
-	int i = 3;
-	char * operator = input->children[1]->contents;
-	while(strstr(input->children[i]->tag, "expr")) {
-		ret = eval_operator(ret, eval(input->children[i]), operator);
-		i++;
-	}
-	return ret;	
-}	
