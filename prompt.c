@@ -99,29 +99,55 @@ lval* lval_read_num(mpc_ast_t* t){
 	long x = strtol(t->contents, NULL, 10);
 	return errno !=ERANGE ? lval_num(x) : lval_err("Invalid Number");
 }
-//TODO
-/*
 lval* lval_read(mpc_ast_t* t){
 	
 	if (strstr(t->tag, "number")) { return lval_read_num(t);}
-	if (strstr(input->tag, "symbol")) { return lval_sym(t->contents);}
+	if (strstr(t->tag, "symbol")) { return lval_sym(t->contents);}
 
 	lval* x = NULL;
-	int i = 3;
+	
+	if (strcmp(t->tag, "<")) {  x =lval_sexpr();}
+	if (strcmp(t->tag, "sexpr")) {x = lval_sexpr();}
 
+	for(int i = 0; i<t->children_num; i++){
+		
+		if(!strcmp(t->children[i]->contents, "(")) {continue;}
+		if(!strcmp(t->children[i]->contents, ")")) {continue;}
+		if(!strcmp(t->children[i]->contents, "regex")) {continue;}
+		x = lval_add(x, lval_read(t->children[i]));
+		}
 	}
-*/
-void lval_print(lval v){
-	switch(v.type){
-		case LVAL_NUM: printf("%li", v.num);break;
-		case LVAL_ERR:
-		switch(v.err){
-			case LERR_DIV_ZERO	: printf("Error: Division by Zero!"); break;
-			case LERR_BAD_OP	: printf("Error: Invalid operator!"); break;
-			case LERR_BAD_NUM	: printf("Error: Invalid Number!"); break;
-			default 		: printf("Unknown Error!"); break;
-			}
-			break;
+
+lval* lval_add(lval* v, lval* x){
+	v->count++;
+	v->cell= realloc(v->cell, sizeof(lval *)* v->count);
+	v->cell[v->count - 1] = x;
+	return v;
+	}
+
+void lval_print(lval* v);
+
+void lval_expr_print(lval* v, char open, char close){
+	putchar(open);
+	
+	for(int i =0; i< v->count; i++){
+		lval_print(v->cell[i]);
+	}
+	
+	if(i !=(v->count -1)){
+		putchar(' ');
+	}
+	
+	putchar(close);
+
+}
+
+void lval_print(lval* v){
+	switch(v->type){
+		case LVAL_NUM: printf("%li", v->num);break;
+		case LVAL_ERR: printf("Error : %s", v->err); break;
+		case LVAL_SYM: printf("%s", v->sym); break;
+		case LVAL_SEXPR: lval_expr_print(v, '(', ')'); break; 
 		default: printf("Lval type invalid!!!");
 		}
 }
