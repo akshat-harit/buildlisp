@@ -157,40 +157,83 @@ void lval_println(lval v){
 	putchar('\n');
 }
 
-lval eval_operator(const lval x, const lval y, const char * op){
+lval* lval_pop(lval* v, int i){
+	lval* x = v->cell[i];
+	memmove(&v->cell[i], v->cell[i+1], sizeof(lval*)*(v->count-i-1));
+	v->count--;
+	v->cell = realloc(v->cell, sizeof(lval*)*v->count);
+	return x;
+	}
+
+lval* lval_take(lval* v, int i){
+	lval* x = lval_pop(v, i);
+	lval_del(v);
+	return x;
+	}
+
+
+lval* builtin_op(lval* v, char* op){
 	
-	if(x.type == LVAL_ERR){return x;}
-	if(y.type == LVAL_ERR){return y;}
-	long a1 = x.num;
-	long a2 = y.num;
-	if(!strcmp(op, "+")) {return lval_num(a1+a2);}
-	if(!strcmp(op, "-")) {return lval_num(a1-a2);}
-	if(!strcmp(op, "*")) {return lval_num(a1*a2);}
-	if(!strcmp(op, "/")) {
-		if (a2 == 0 )
-			return lval_err(LERR_DIV_ZERO);
-		else
-			return lval_num(a1/a2);
+	lval* x = lval_pop(v, 0);
+	if(!strcmp(op, "-") && v->count ==0 )
+		if(v->type==LVAL_NUM){
+			x->num = -x->num;
 		}
-	return lval_err(LERR_BAD_OP);;
-}
-
-lval eval(mpc_ast_t* input){
-
-	if (strstr(input->tag, "number")) {
-		errno = 0;
-		long x = strtol(input->contents, NULL, 10);
-		return (errno != ERANGE) ? lval_num(x) : lval_err(LERR_BAD_NUM);
+		else{
+			return lval_err("Can't operate on a non-number");
+		}
+	while(v->count >0){
+		lval* y = lval_pop(v,0);
+		if (!strcmp(op, "+")) x->num += y->num;
+		if (!strcmp(op, "-")) x->num -= y->num;
+		if (!strcmp(op, "*")) x->num *= y->num;
+		if (!strcmp(op, "/")) {
+			if (y->num == 0) {
+				lval_del(x);
+				lval_del(y);
+				x = lval_err("Division by zero undefined");
+				break;
+				}
+			else{
+				x->num /=y->num;
+				}
+			}
+		lval_del(y);
+		}
+	lval_del(v);
+	return x;
+	
 	}
-	lval ret = eval(input->children[2]);
-	int i = 3;
-	char * operator = input->children[1]->contents;
-	while(strstr(input->children[i]->tag, "expr")) {
-		ret = eval_operator(ret, eval(input->children[i]), operator);
-		i++;
+
+lval* lval_eval_sexpr(lval* v){
+	for ( int i = 0; i<v->count; i++){
+		v->cell[i] = lval_eval(v->cell[i]);
+		}
+	for(int i = 0; i<v->count; i++){
+		if(v->cell[i]->type = LVAL_ERR){
+			return lval_take(v,i);
+			}
+		}
+	if(v->count == 0){
+		return v;
+		}
+	
+	if(v->count == 1){
+		return lval_take(v, 0);
+		}
+
+	lval* f  = lval_pop(v, 0);
+	if (f->type != LVAL_SYM){
+		lval_del(f);
+		lval_del(v);
+		return lval_err("S-expr doesn't start with symbol");
+		}
+	lval* result = builtin_op(v, f->sym);
+	lval_del(f);
+	return result;
+
 	}
-	return ret;	
-}	
+
 
 int main(int argv, char **argc){
 
